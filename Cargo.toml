@@ -1,8 +1,14 @@
-[package]
+[workspace.package]
 name = "zkp-learning"
 version = "0.1.0"
 edition = "2021"
+authors = ["luckychacha"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = [
+	"simple-example",
+	"fibonacci"
+]
 
-[dependencies]
+[workspace.dependencies]
+halo2_proofs = "0.3.0"

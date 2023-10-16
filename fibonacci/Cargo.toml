@@ -1,0 +1,10 @@
+[package]
+name = "fibonacci"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+description = "Lesson 2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
