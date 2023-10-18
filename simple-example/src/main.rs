@@ -1,6 +1,9 @@
 use ff::Field;
 use halo2_proofs::circuit::{AssignedCell, Chip, Layouter, Value};
-use halo2_proofs::plonk::{Advice, Assigned, Column, Error, Instance, Selector};
+use halo2_proofs::plonk::{
+    Advice, Assigned, Column, ConstraintSystem, Error, Fixed, Instance, Selector,
+};
+use halo2_proofs::poly::Rotation;
 
 trait NumericInstructions<F: Field>: Chip<F> {
     type Num;
@@ -30,6 +33,58 @@ struct FieldChip<F: Field> {
     _marker: std::marker::PhantomData<F>,
 }
 
+impl<F: Field> FieldChip<F> {
+    fn construct(config: <Self as Chip<F>>::Config) -> Self {
+        Self {
+            config,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    fn configure(
+        meta: &mut ConstraintSystem<F>,
+        advice: [Column<Advice>; 2],
+        instance: Column<Instance>,
+        constant: Column<Fixed>,
+    ) -> <Self as Chip<F>>::Config {
+        meta.enable_equality(instance);
+        meta.enable_constant(constant);
+        for column in &advice {
+            meta.enable_equality(*column);
+        }
+
+        let s_mul = meta.selector();
+
+        meta.create_gate("mul", |meta| {
+            let lhs = meta.query_advice(advice[0], Rotation::cur());
+            let rhs = meta.query_advice(advice[1], Rotation::cur());
+            let out = meta.query_advice(advice[0], Rotation::next());
+
+            let s_mul = meta.query_selector(s_mul);
+        });
+
+        FieldConfig {
+            advice,
+            instance,
+            s_mul,
+        }
+        //
+    }
+}
+
+impl<F: Field> Chip<F> for FieldChip<F> {
+    type Config = FieldConfig;
+    type Loaded = ();
+
+    fn config(&self) -> &Self::Config {
+        &self.config
+    }
+
+    fn loaded(&self) -> &Self::Loaded {
+        &()
+    }
+}
+
 struct FieldConfig {
     advice: [Column<Advice>; 2],
     instance: Column<Instance>,
@@ -37,6 +92,80 @@ struct FieldConfig {
 }
 
 struct Number<F: Field>(AssignedCell<F, F>);
+
+impl<F: Field> NumericInstructions<F> for FieldChip<F> {
+    type Num = Number<F>;
+
+    fn load_private(
+        &self,
+        mut layouter: impl Layouter<F>,
+        value: Value<F>,
+    ) -> Result<Self::Num, Error> {
+        let config = self.config();
+
+        layouter.assign_region(
+            || "load private",
+            |mut region| {
+                region
+                    .assign_advice(|| "private input", config.advice[0], 0, || value)
+                    .map(Number)
+            },
+        )
+    }
+
+    fn load_constant(
+        &self,
+        mut layouter: impl Layouter<F>,
+        constant: F,
+    ) -> Result<Self::Num, Error> {
+        let config = self.config();
+
+        layouter.assign_region(
+            || "load constant",
+            |mut region| {
+                region
+                    .assign_advice_from_constant(|| "constant value", config.advice[0], 0, constant)
+                    .map(Number)
+            },
+        )
+    }
+
+    fn mul(
+        &self,
+        mut layouter: impl Layouter<F>,
+        a: Self::Num,
+        b: Self::Num,
+    ) -> Result<Self::Num, Error> {
+        let config = self.config();
+
+        layouter.assign_region(
+            || "mul",
+            |mut region| {
+                config.s_mul.enable(&mut region, 0)?;
+
+                a.0.copy_advice(|| "lhs", &mut region, config.advice[0], 0)?;
+                b.0.copy_advice(|| "rhs", &mut region, config.advice[1], 0)?;
+
+                let value = a.0.value().copied() * b.0.value();
+
+                region
+                    .assign_advice(|| "lhs * rhs", config.advice[0], 1, || value)
+                    .map(Number)
+            },
+        )
+    }
+
+    fn expose_public(
+        &self,
+        mut layouter: impl Layouter<F>,
+        num: Self::Num,
+        row: usize,
+    ) -> Result<(), Error> {
+        let config = self.config();
+
+        layouter.constrain_instance(num.0.cell(), config.instance, row)
+    }
+}
 
 fn main() {
     println!("Hello, lesson 1: Simple example!");
