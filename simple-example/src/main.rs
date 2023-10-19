@@ -4,6 +4,35 @@ use halo2_proofs::plonk::{
     Advice, Assigned, Column, ConstraintSystem, Error, Fixed, Instance, Selector,
 };
 use halo2_proofs::poly::Rotation;
+use std::fmt;
+use std::fmt::Formatter;
+
+#[derive(Clone)]
+pub struct MyError {
+    pub msg: String,
+}
+
+impl fmt::Debug for MyError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Debug: MyError {{ msg: {} }}", self.msg)
+    }
+}
+
+impl fmt::Display for MyError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Display: MyError {{ msg: {} }}", self.msg)
+    }
+}
+
+fn test_error(info: &str, res: bool) -> Result<(), MyError> {
+    if res {
+        Ok(())
+    } else {
+        Err(MyError {
+            msg: info.to_string(),
+        })
+    }
+}
 
 trait NumericInstructions<F: Field>: Chip<F> {
     type Num;
@@ -61,6 +90,7 @@ impl<F: Field> FieldChip<F> {
             let out = meta.query_advice(advice[0], Rotation::next());
 
             let s_mul = meta.query_selector(s_mul);
+            vec![s_mul * (lhs * rhs - out)]
         });
 
         FieldConfig {
@@ -68,7 +98,6 @@ impl<F: Field> FieldChip<F> {
             instance,
             s_mul,
         }
-        //
     }
 }
 
@@ -85,6 +114,7 @@ impl<F: Field> Chip<F> for FieldChip<F> {
     }
 }
 
+#[derive(Debug, Clone)]
 struct FieldConfig {
     advice: [Column<Advice>; 2],
     instance: Column<Instance>,
@@ -168,5 +198,14 @@ impl<F: Field> NumericInstructions<F> for FieldChip<F> {
 }
 
 fn main() {
+    if let Ok(_) = test_error("ok", true) {
+        println!("Ok");
+    }
+    if let Err(e) = test_error("error 1", false) {
+        println!("Error: {}", e);
+    }
+    if let Err(e) = test_error("error 2", false) {
+        println!("Error: {}", e);
+    }
     println!("Hello, lesson 1: Simple example!");
 }
