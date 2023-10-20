@@ -24,9 +24,9 @@ impl fmt::Display for MyError {
     }
 }
 
-fn test_error(info: &str, res: bool) -> Result<(), MyError> {
+fn test_error(info: &str, res: bool) -> Result<String, MyError> {
     if res {
-        Ok(())
+        Ok(info.into())
     } else {
         Err(MyError {
             msg: info.to_string(),
@@ -198,14 +198,14 @@ impl<F: Field> NumericInstructions<F> for FieldChip<F> {
 }
 
 fn main() {
-    if let Ok(_) = test_error("ok", true) {
-        println!("Ok");
+    if let Ok(info) = test_error("ok", true) {
+        println!("{info:?}");
     }
     if let Err(e) = test_error("error 1", false) {
-        println!("Error: {}", e);
+        println!("Error: {e}");
     }
     if let Err(e) = test_error("error 2", false) {
-        println!("Error: {}", e);
+        println!("Error: {e}");
     }
     println!("Hello, lesson 1: Simple example!");
 }
