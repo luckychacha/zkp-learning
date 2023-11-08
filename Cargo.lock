@@ -108,6 +108,9 @@ dependencies = [
 [[package]]
 name = "fibonacci"
 version = "0.1.0"
+dependencies = [
+ "halo2_proofs",
+]
 
 [[package]]
 name = "funty"
